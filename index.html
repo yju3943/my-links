@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>My Links</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #05060f;
+    color: #e8ecff;
+    font-family: "Consolas", "D2Coding", monospace;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    gap: 24px;
+    padding: 24px;
+  }
+  h1 {
+    font-size: 28px;
+    letter-spacing: 4px;
+    color: #7cf2ff;
+    text-shadow: 0 0 12px rgba(124, 242, 255, 0.5);
+  }
+  p.sub { color: #8a92b8; font-size: 13px; }
+  ul { list-style: none; width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 12px; }
+  a {
+    display: block;
+    padding: 16px 20px;
+    border: 1px solid #263056;
+    border-radius: 10px;
+    background: #0b0f22;
+    color: #e8ecff;
+    text-decoration: none;
+    transition: border-color .15s, transform .15s;
+  }
+  a:hover { border-color: #7cf2ff; transform: translateY(-2px); }
+  a .name { display: block; font-size: 16px; }
+  a .desc { display: block; margin-top: 4px; font-size: 12px; color: #8a92b8; }
+  footer { color: #4a5178; font-size: 12px; }
+</style>
+</head>
+<body>
+  <h1>MY LINKS</h1>
+  <p class="sub">yju3943</p>
+
+  <ul>
+    <li>
+      <a href="hello/galaga.html">
+        <span class="name">GALAGA</span>
+        <span class="desc">갤러그 스타일 슈팅 게임</span>
+      </a>
+    </li>
+    <li>
+      <a href="https://github.com/yju3943/my-links">
+        <span class="name">GitHub Repository</span>
+        <span class="desc">이 사이트의 소스 코드</span>
+      </a>
+    </li>
+  </ul>
+
+  <footer>Hosted on GitHub Pages</footer>
+</body>
+</html>
