@@ -9,8 +9,8 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-paperlogy);
+  --font-mono: var(--font-paperlogy);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -23,7 +23,16 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  font-family: var(--font-paperlogy), system-ui, sans-serif;
+}
+
+/* 코드 블록까지 같은 글꼴을 쓰되, 글자 폭만 고정해 정렬을 유지한다 */
+code,
+pre,
+kbd,
+samp {
+  font-family: var(--font-paperlogy), system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
 }
 
 /* typography 플러그인이 넣는 백틱/따옴표 장식 제거 */
