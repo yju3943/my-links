@@ -1,0 +1,20 @@
+[
+  {
+    "title": "Strava",
+    "url": "https://www.strava.com",
+    "description": "러닝과 라이딩 기록을 남기고 친구들과 공유하는 서비스",
+    "category": "운동 기록 앱"
+  },
+  {
+    "title": "MyFitnessPal",
+    "url": "https://www.myfitnesspal.com",
+    "description": "먹은 음식과 칼로리를 기록해 식단을 관리",
+    "category": "운동 기록 앱"
+  },
+  {
+    "title": "ExRx.net",
+    "url": "https://exrx.net",
+    "description": "운동 동작별 자세와 자극 부위를 정리해 둔 자료실",
+    "category": "참고 자료"
+  }
+]

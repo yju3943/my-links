@@ -1,5 +1,4 @@
 import Image from "next/image";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { FeelingBadge, IntensityMeter, KindBadge } from "@/components/badges";
 import {
@@ -40,14 +39,7 @@ export default async function WorkoutPage({ params }: PageProps<"/posts/[slug]">
 
   return (
     <main className="mx-auto w-full max-w-2xl px-6 py-16">
-      <Link
-        href="/"
-        className="text-sm text-black/60 hover:text-black dark:text-white/60 dark:hover:text-white"
-      >
-        ← 목록으로
-      </Link>
-
-      <article className="mt-8">
+      <article>
         <header className="border-b border-black/10 pb-6 dark:border-white/15">
           <h1 className="text-3xl font-semibold tracking-tight">
             <time dateTime={workout.date}>{formatDate(workout.date)}</time>
