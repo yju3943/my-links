@@ -7,6 +7,7 @@ const NAV = [
   { href: "/", label: "홈" },
   { href: "/links", label: "링크 모음" },
   { href: "/news", label: "주요 뉴스" },
+  { href: "/dashboard", label: "대시보드" },
 ] as const;
 
 export function SiteHeader() {

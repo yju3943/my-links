@@ -35,6 +35,23 @@ samp {
   font-variant-numeric: tabular-nums;
 }
 
+/* 차트 색. 밝은 화면/어두운 화면 각각 검증한 값 (dataviz 기본 팔레트 slot 1) */
+.viz {
+  --viz-series: #2a78d6;
+  --viz-muted: #898781;
+  --viz-baseline: #c3c2b7;
+  --viz-track: rgba(11, 11, 11, 0.05);
+}
+
+@media (prefers-color-scheme: dark) {
+  .viz {
+    --viz-series: #3987e5;
+    --viz-muted: #898781;
+    --viz-baseline: #383835;
+    --viz-track: rgba(255, 255, 255, 0.07);
+  }
+}
+
 /* typography 플러그인이 넣는 백틱/따옴표 장식 제거 */
 .prose :where(code):not(:where([class~="not-prose"] *))::before,
 .prose :where(code):not(:where([class~="not-prose"] *))::after,
