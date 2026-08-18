@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>슈퍼 점프 어드벤처</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #10131c;
+    color: #e8ecf6;
+    font-family: "Segoe UI", "Malgun Gothic", system-ui, sans-serif;
+    padding: 16px;
+  }
+  .wrap { width: 900px; max-width: 100%; }
+  .hud {
+    display: flex;
+    gap: 26px;
+    align-items: center;
+    padding: 10px 18px;
+    background: #1a1f2c;
+    border: 1px solid #2b3245;
+    border-bottom: 0;
+    border-radius: 12px 12px 0 0;
+    font-variant-numeric: tabular-nums;
+  }
+  .hud .item { display: flex; flex-direction: column; gap: 2px; }
+  .hud .label {
+    font-size: 10px;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    color: #8b93a7;
+    font-weight: 600;
+  }
+  .hud .val { font-size: 19px; font-weight: 700; }
+  .hud .spacer { flex: 1; }
+  .hud .hint { font-size: 12px; color: #8b93a7; text-align: right; line-height: 1.6; }
+  .hud .hint b { color: #e8ecf6; }
+  .stage-wrap {
+    position: relative;
+    line-height: 0;
+    border: 1px solid #2b3245;
+    border-radius: 0 0 12px 12px;
+    overflow: hidden;
+    box-shadow: 0 24px 60px rgba(0,0,0,.55);
+  }
+  canvas { display: block; width: 100%; height: auto; image-rendering: pixelated; }
+  .overlay {
+    position: absolute;
+    inset: 0;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    background: rgba(8,11,18,.82);
+    backdrop-filter: blur(3px);
+    line-height: 1.5;
+  }
+  .overlay.show { display: flex; }
+  .overlay h1 { margin: 0; font-size: 40px; letter-spacing: .05em; }
+  .overlay p { margin: 12px 0 0; color: #9aa3b8; font-size: 15px; }
+  .overlay p b { color: #ffd23f; font-size: 22px; font-variant-numeric: tabular-nums; }
+  .overlay button {
+    margin-top: 22px;
+    padding: 12px 30px;
+    font: 600 15px inherit;
+    font-family: inherit;
+    color: #10131c;
+    background: #ffd23f;
+    border: 0;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: transform .12s ease, filter .12s ease;
+  }
+  .overlay button:hover { filter: brightness(1.08); transform: translateY(-1px); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hud">
+    <div class="item"><span class="label">Score</span><span class="val" id="hudScore">0</span></div>
+    <div class="item"><span class="label">Coins</span><span class="val" id="hudCoins">0</span></div>
+    <div class="item"><span class="label">Lives</span><span class="val" id="hudLives">♥♥♥</span></div>
+    <div class="item"><span class="label">Stage</span><span class="val" id="hudStage">1 / 4</span></div>
+    <div class="spacer"></div>
+    <div class="hint"><b>&larr; &rarr;</b> 이동 &nbsp; <b>&uarr; / Space</b> 점프 (길게 누르면 높이)<br /><b>R</b> 처음부터</div>
+  </div>
+
+  <div class="stage-wrap">
+    <canvas id="game" width="900" height="540"></canvas>
+    <div class="overlay" id="overlay">
+      <h1 id="ovTitle">STAGE CLEAR</h1>
+      <p id="ovText">점수 <b>0</b></p>
+      <button id="ovBtn">계속</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  'use strict';
+
+  const W = 900, H = 540;
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+
+  const hud = {
+    score: document.getElementById('hudScore'),
+    coins: document.getElementById('hudCoins'),
+    lives: document.getElementById('hudLives'),
+    stage: document.getElementById('hudStage')
+  };
+  const ov = {
+    box: document.getElementById('overlay'),
+    title: document.getElementById('ovTitle'),
+    text: document.getElementById('ovText'),
+    btn: document.getElementById('ovBtn')
+  };
+
+  /* ---------- 물리 상수 ---------- */
+  const GRAVITY    = 0.68;
+  const MAX_FALL   = 15;
+  const ACCEL      = 0.75;
+  const FRICTION   = 0.82;
+  const MAX_SPEED  = 4.7;
+  const JUMP_VEL   = -13.2;   // 점프 높이 ≈ 128px
+  const JUMP_CUT   = 0.42;    // 버튼을 일찍 떼면 상승 속도를 깎아 점프 곡선을 조절
+  const COYOTE     = 7;       // 발판을 막 벗어난 뒤에도 점프 허용(프레임)
+  const BUFFER     = 7;       // 착지 직전에 누른 점프를 기억(프레임)
+  const STOMP_VEL  = -9.5;
+
+  /* ---------- 스테이지 데이터 ---------- */
+  const G = 470;                                             // 지면 윗면 y
+  const grd  = (x, w) => ({ x, y: G, w, h: 70 });
+  const plat = (x, y, w) => ({ x, y, w, h: 24 });
+  const row  = (x, y, n, gap = 46) =>
+    Array.from({ length: n }, (_, i) => ({ x: x + i * gap, y }));
+  const foe  = (x, left, right, y = G - 32, speed = 1.15) =>
+    ({ x, y, left, right, speed });
+
+  const LEVELS = [
+    {
+      name: '첫 걸음', width: 3200, spawn: { x: 70, y: 380 }, flagX: 3060,
+      solids: [grd(0, 1200), grd(1340, 860), grd(2280, 920),
+        plat(420, 370, 140), plat(660, 290, 140), plat(940, 355, 130),
+        plat(1500, 355, 160), plat(1810, 285, 140), plat(2450, 365, 150)],
+      coins: [...row(445, 315, 3), ...row(690, 235, 3), ...row(965, 300, 3),
+        ...row(1525, 300, 3), ...row(1840, 230, 3), ...row(2475, 310, 3),
+        ...row(2760, 410, 4)],
+      foes: [foe(720, 620, 1080), foe(1620, 1360, 1920), foe(2620, 2400, 2960)]
+    },
+    {
+      name: '구멍 조심', width: 3600, spawn: { x: 70, y: 380 }, flagX: 3450,
+      solids: [grd(0, 800), grd(940, 560), grd(1640, 420), grd(2200, 1400),
+        plat(560, 375, 130), plat(1080, 365, 140), plat(1310, 275, 120),
+        plat(1750, 355, 130), plat(2010, 285, 140), plat(2400, 375, 150),
+        plat(2700, 295, 140), plat(3010, 365, 130)],
+      coins: [...row(585, 320, 2), ...row(1105, 310, 3), ...row(1335, 220, 2),
+        ...row(1775, 300, 2), ...row(2035, 230, 3), ...row(2425, 320, 3),
+        ...row(2725, 240, 3), ...row(3035, 310, 2), ...row(3180, 410, 4)],
+      foes: [foe(500, 300, 760), foe(1180, 960, 1500), foe(2350, 2220, 2680),
+        foe(2440, 2400, 2540, 375 - 32, 0.9), foe(2950, 2760, 3320)]
+    },
+    {
+      name: '계단과 절벽', width: 4000, spawn: { x: 70, y: 380 }, flagX: 3860,
+      solids: [grd(0, 600), grd(740, 420), grd(1300, 260), grd(1700, 300),
+        grd(2140, 600), grd(2880, 1120),
+        plat(400, 355, 120), plat(900, 345, 130), plat(1350, 290, 120),
+        plat(1760, 355, 120),
+        plat(2200, 400, 90), plat(2320, 330, 90), plat(2440, 260, 90),
+        plat(3010, 375, 140), plat(3260, 290, 140), plat(3520, 375, 140)],
+      coins: [...row(425, 300, 2), ...row(925, 290, 3), ...row(1375, 235, 2),
+        ...row(1785, 300, 2), ...row(2225, 350, 1), ...row(2345, 280, 1),
+        ...row(2465, 210, 2), ...row(3035, 320, 3), ...row(3285, 235, 3),
+        ...row(3545, 320, 3), ...row(2600, 410, 4)],
+      foes: [foe(350, 180, 560), foe(820, 760, 1120), foe(1400, 1310, 1540),
+        foe(2260, 2160, 2680), foe(3080, 2920, 3420), foe(3620, 3460, 3860)]
+    },
+    {
+      name: '공중 산책', width: 4200, spawn: { x: 70, y: 380 }, flagX: 4060,
+      solids: [grd(0, 520), grd(900, 320), grd(1420, 260), grd(1900, 300),
+        grd(2500, 1700),
+        plat(590, 395, 110), plat(760, 325, 110),
+        plat(1270, 385, 110),
+        plat(1730, 375, 110),
+        plat(2250, 395, 110), plat(2380, 330, 100),
+        plat(2700, 360, 130), plat(2960, 285, 130), plat(3300, 370, 140),
+        plat(3600, 290, 140), plat(3900, 370, 120)],
+      coins: [...row(605, 340, 2), ...row(780, 270, 2), ...row(1290, 330, 2),
+        ...row(1750, 320, 2), ...row(2265, 340, 2), ...row(2395, 275, 2),
+        ...row(2725, 305, 3), ...row(2985, 230, 3), ...row(3325, 315, 3),
+        ...row(3625, 235, 3), ...row(3920, 315, 2)],
+      foes: [foe(300, 120, 480), foe(1020, 920, 1200), foe(2020, 1920, 2180),
+        foe(2620, 2520, 2900), foe(3120, 3000, 3420), foe(3520, 3440, 3820),
+        foe(3960, 3860, 4120)]
+    }
+  ];
+
+  /* ---------- 상태 ---------- */
+  const keys = Object.create(null);
+  let level, solids, coins, foes, flag, cam;
+  let player, stageIndex, score, coinCount, lives, mode, timer, tick;
+
+  function resetGame() {
+    score = 0; coinCount = 0; lives = 3; stageIndex = 0;
+    loadStage(0);
+  }
+
+  function loadStage(i) {
+    stageIndex = i;
+    level = LEVELS[i];
+    solids = level.solids.map(s => ({ ...s }));
+    coins = level.coins.map((c, n) => ({ x: c.x, y: c.y, r: 11, taken: false, phase: n * 0.7 }));
+    foes = level.foes.map(f => ({
+      x: f.x, y: f.y, w: 32, h: 32,
+      vx: f.speed, left: f.left, right: f.right, dead: 0, alive: true
+    }));
+    flag = { x: level.flagX, y: G - 210, h: 210, raise: 0 };
+    spawnPlayer();
+    cam = { x: 0 };
+    mode = 'play';
+    timer = 0;
+    hideOverlay();
+    updateHUD();
+  }
+
+  function spawnPlayer() {
+    player = {
+      x: level.spawn.x, y: level.spawn.y, w: 28, h: 38,
+      vx: 0, vy: 0, onGround: false, face: 1,
+      coyote: 0, buffer: 0, jumpHeld: false, anim: 0
+    };
+  }
+
+  function updateHUD() {
+    hud.score.textContent = score.toLocaleString();
+    hud.coins.textContent = coinCount;
+    hud.lives.textContent = lives > 0 ? '♥'.repeat(lives) : '—';
+    hud.stage.textContent = (stageIndex + 1) + ' / ' + LEVELS.length;
+  }
+
+  function showOverlay(title, text, btn) {
+    ov.title.textContent = title;
+    ov.text.innerHTML = text;
+    ov.btn.textContent = btn;
+    ov.box.classList.add('show');
+  }
+  const hideOverlay = () => ov.box.classList.remove('show');
+
+  /* ---------- 충돌 ---------- */
+  const hit = (a, b) =>
+    a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+
+  const solidAt = (x, y) =>
+    solids.some(s => x >= s.x && x <= s.x + s.w && y >= s.y && y <= s.y + s.h);
+
+  /* ---------- 갱신 ---------- */
+  function step() {
+    tick++;
+    if (mode === 'play') updatePlay();
+    else if (mode === 'dying') {
+      timer++;
+      player.vy = Math.min(player.vy + GRAVITY, MAX_FALL);
+      player.y += player.vy;
+      if (timer > 70) afterDeath();
+    } else if (mode === 'clear') {
+      timer++;
+      flag.raise = Math.min(1, flag.raise + 0.03);
+      if (timer === 60) finishStage();
+    }
+    for (const c of coins) c.phase += 0.12;
+    updateCamera();
+  }
+
+  function updatePlay() {
+    const p = player;
+
+    // 좌우 이동
+    const left = keys['ArrowLeft'] || keys['KeyA'];
+    const right = keys['ArrowRight'] || keys['KeyD'];
+    if (left && !right)      { p.vx -= ACCEL; p.face = -1; }
+    else if (right && !left) { p.vx += ACCEL; p.face = 1; }
+    else                     { p.vx *= FRICTION; if (Math.abs(p.vx) < 0.05) p.vx = 0; }
+    p.vx = Math.max(-MAX_SPEED, Math.min(MAX_SPEED, p.vx));
+
+    // 점프 (코요테 타임 + 입력 버퍼로 조작감 확보)
+    if (p.coyote > 0) p.coyote--;
+    if (p.buffer > 0) p.buffer--;
+    if (p.buffer > 0 && p.coyote > 0) {
+      p.vy = JUMP_VEL;
+      p.onGround = false;
+      p.buffer = 0;
+      p.coyote = 0;
+    }
+    if (!p.jumpHeld && p.vy < 0) p.vy *= JUMP_CUT;   // 짧게 누르면 낮게 뜀
+
+    p.vy = Math.min(p.vy + GRAVITY, MAX_FALL);
+
+    // X축 → Y축 순서로 분리 해결
+    p.x += p.vx;
+    if (p.x < 0) { p.x = 0; p.vx = 0; }
+    for (const s of solids) {
+      if (!hit(p, s)) continue;
+      if (p.vx > 0) p.x = s.x - p.w;
+      else if (p.vx < 0) p.x = s.x + s.w;
+      p.vx = 0;
+    }
+
+    p.y += p.vy;
+    p.onGround = false;
+    for (const s of solids) {
+      if (!hit(p, s)) continue;
+      if (p.vy > 0) { p.y = s.y - p.h; p.onGround = true; }
+      else if (p.vy < 0) { p.y = s.y + s.h; }
+      p.vy = 0;
+    }
+    if (p.onGround) p.coyote = COYOTE;
+
+    if (Math.abs(p.vx) > 0.3 && p.onGround) p.anim += Math.abs(p.vx) * 0.12;
+
+    // 구멍으로 추락
+    if (p.y > H + 80) { die(); return; }
+
+    updateFoes();
+    if (mode !== 'play') return;
+
+    // 코인
+    for (const c of coins) {
+      if (c.taken) continue;
+      if (p.x < c.x + c.r && p.x + p.w > c.x - c.r &&
+          p.y < c.y + c.r && p.y + p.h > c.y - c.r) {
+        c.taken = true;
+        coinCount++;
+        score += 100;
+        updateHUD();
+      }
+    }
+
+    // 골인 깃발
+    if (p.x + p.w > flag.x - 6 && p.x < flag.x + 20) {
+      mode = 'clear';
+      timer = 0;
+      score += 500 + lives * 200;
+      updateHUD();
+    }
+  }
+
+  function updateFoes() {
+    const p = player;
+    for (const f of foes) {
+      if (!f.alive) { f.dead++; continue; }
+
+      f.x += f.vx;
+      // 순찰 범위 · 벽 · 발판 끝에서 방향 전환
+      const front = f.vx > 0 ? f.x + f.w + 2 : f.x - 2;
+      if (f.x <= f.left || f.x + f.w >= f.right ||
+          !solidAt(front, f.y + f.h + 6) || solidAt(front, f.y + f.h / 2)) {
+        f.vx *= -1;
+        f.x = Math.max(f.left, Math.min(f.right - f.w, f.x));
+      }
+
+      if (!hit(p, f)) continue;
+
+      // 위에서 밟았는지 판정: 떨어지는 중이고 발이 적의 윗부분에 닿았을 때
+      if (p.vy > 0 && p.y + p.h - p.vy <= f.y + 12) {
+        f.alive = false;
+        f.dead = 1;
+        p.vy = STOMP_VEL;
+        p.jumpHeld = false;
+        score += 200;
+        updateHUD();
+      } else {
+        die();
+        return;
+      }
+    }
+  }
+
+  function die() {
+    mode = 'dying';
+    timer = 0;
+    lives--;
+    player.vy = -11;
+    updateHUD();
+  }
+
+  function afterDeath() {
+    if (lives <= 0) {
+      mode = 'over';
+      showOverlay('GAME OVER', '최종 점수 <b>' + score.toLocaleString() + '</b>', '다시 도전');
+    } else {
+      spawnPlayer();
+      // 적과 코인은 그대로 두고 캐릭터만 부활
+      mode = 'play';
+      timer = 0;
+    }
+  }
+
+  function finishStage() {
+    if (stageIndex + 1 < LEVELS.length) {
+      mode = 'stageclear';
+      showOverlay('STAGE ' + (stageIndex + 1) + ' CLEAR!',
+        '점수 <b>' + score.toLocaleString() + '</b><br>다음 스테이지: ' + LEVELS[stageIndex + 1].name,
+        '다음 스테이지');
+    } else {
+      mode = 'allclear';
+      showOverlay('ALL CLEAR! 🎉',
+        '모든 스테이지를 클리어했습니다<br>최종 점수 <b>' + score.toLocaleString() + '</b>',
+        '처음부터');
+    }
+  }
+
+  function advance() {
+    if (mode === 'stageclear') loadStage(stageIndex + 1);
+    else resetGame();
+  }
+
+  function updateCamera() {
+    const target = player.x + player.w / 2 - W / 2;
+    const max = level.width - W;
+    cam.x += (Math.max(0, Math.min(max, target)) - cam.x) * 0.12;
+  }
+
+  /* ---------- 그리기 ---------- */
+  function drawBackground() {
+    const sky = ctx.createLinearGradient(0, 0, 0, H);
+    sky.addColorStop(0, '#5aa9f0');
+    sky.addColorStop(0.62, '#9ad2f7');
+    sky.addColorStop(1, '#d8eefb');
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, W, H);
+
+    // 먼 언덕 (느린 시차)
+    ctx.fillStyle = '#6fbf73';
+    for (let i = 0; i < 14; i++) {
+      const hx = i * 420 - (cam.x * 0.25) % 420 - 100;
+      ctx.beginPath();
+      ctx.arc(hx, G + 40, 170, Math.PI, 0);
+      ctx.fill();
+    }
+    ctx.fillStyle = '#8ed48f';
+    for (let i = 0; i < 16; i++) {
+      const hx = i * 320 - (cam.x * 0.45) % 320 - 60;
+      ctx.beginPath();
+      ctx.arc(hx, G + 70, 120, Math.PI, 0);
+      ctx.fill();
+    }
+
+    // 구름
+    ctx.fillStyle = 'rgba(255,255,255,.92)';
+    for (let i = 0; i < 10; i++) {
+      const cx = i * 460 - (cam.x * 0.18) % 460 - 120;
+      const cy = 70 + (i % 3) * 55;
+      cloud(cx, cy, 1 + (i % 2) * 0.35);
+    }
+  }
+
+  function cloud(x, y, s) {
+    ctx.beginPath();
+    ctx.arc(x, y, 22 * s, 0, Math.PI * 2);
+    ctx.arc(x + 26 * s, y - 10 * s, 28 * s, 0, Math.PI * 2);
+    ctx.arc(x + 56 * s, y, 22 * s, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  function drawSolids() {
+    for (const s of solids) {
+      const isGround = s.h > 30;
+      ctx.fillStyle = isGround ? '#a4632a' : '#c07a3a';
+      ctx.fillRect(s.x, s.y, s.w, s.h);
+      ctx.fillStyle = isGround ? '#4fbf5e' : '#6fd177';
+      ctx.fillRect(s.x, s.y, s.w, isGround ? 12 : 7);
+      ctx.fillStyle = 'rgba(0,0,0,.14)';
+      for (let bx = s.x + 20; bx < s.x + s.w - 8; bx += 40) {
+        ctx.fillRect(bx, s.y + (isGround ? 20 : 12), 3, isGround ? 10 : 6);
+      }
+      ctx.strokeStyle = 'rgba(0,0,0,.18)';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(s.x + 1, s.y + 1, s.w - 2, s.h - 2);
+    }
+  }
+
+  function drawCoins() {
+    for (const c of coins) {
+      if (c.taken) continue;
+      const bob = Math.sin(c.phase) * 4;
+      const spin = Math.abs(Math.cos(c.phase * 0.8));   // 회전하듯 폭이 줄었다 늘었다
+      const cx = c.x, cy = c.y + bob;
+
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.scale(Math.max(0.18, spin), 1);
+      ctx.fillStyle = '#ffcf33';
+      ctx.beginPath(); ctx.arc(0, 0, c.r, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#ffe98a';
+      ctx.beginPath(); ctx.arc(0, 0, c.r * 0.62, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#c78f10';
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(0, 0, c.r, 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
+
+      // 반짝임
+      const tw = (Math.sin(c.phase * 1.6) + 1) / 2;
+      if (tw > 0.55) {
+        const s = (tw - 0.55) * 18;
+        ctx.strokeStyle = 'rgba(255,255,255,' + (tw * 0.9) + ')';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(cx + 9, cy - 12 - s); ctx.lineTo(cx + 9, cy - 12 + s);
+        ctx.moveTo(cx + 9 - s, cy - 12); ctx.lineTo(cx + 9 + s, cy - 12);
+        ctx.stroke();
+      }
+    }
+  }
+
+  function drawFoes() {
+    for (const f of foes) {
+      if (!f.alive) {
+        if (f.dead > 22) continue;
+        // 밟히면 납작해지는 연출
+        const k = f.dead / 22;
+        ctx.globalAlpha = 1 - k;
+        ctx.fillStyle = '#8a5a2b';
+        ctx.fillRect(f.x, f.y + f.h - 10, f.w, 10);
+        ctx.globalAlpha = 1;
+        continue;
+      }
+      const wob = Math.sin(tick * 0.2) * 2;
+      ctx.fillStyle = '#8a5a2b';
+      ctx.beginPath();
+      ctx.moveTo(f.x, f.y + f.h);
+      ctx.lineTo(f.x, f.y + 14);
+      ctx.quadraticCurveTo(f.x + f.w / 2, f.y - 8, f.x + f.w, f.y + 14);
+      ctx.lineTo(f.x + f.w, f.y + f.h);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = '#5d3a16';
+      ctx.fillRect(f.x - 2 + wob, f.y + f.h - 6, 12, 6);
+      ctx.fillRect(f.x + f.w - 10 - wob, f.y + f.h - 6, 12, 6);
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(f.x + 6, f.y + 12, 8, 9);
+      ctx.fillRect(f.x + 18, f.y + 12, 8, 9);
+      ctx.fillStyle = '#1c1c1c';
+      const look = f.vx > 0 ? 3 : 0;
+      ctx.fillRect(f.x + 8 + look, f.y + 15, 3, 5);
+      ctx.fillRect(f.x + 20 + look, f.y + 15, 3, 5);
+    }
+  }
+
+  function drawFlag() {
+    const x = flag.x, base = G;
+    ctx.fillStyle = '#cfd6e4';
+    ctx.fillRect(x, base - flag.h, 6, flag.h);
+    ctx.fillStyle = '#ffd23f';
+    ctx.beginPath(); ctx.arc(x + 3, base - flag.h - 5, 8, 0, Math.PI * 2); ctx.fill();
+
+    const fy = base - flag.h + 16 + flag.raise * (flag.h - 60);
+    const wave = Math.sin(tick * 0.12) * 5;
+    ctx.fillStyle = '#e8443a';
+    ctx.beginPath();
+    ctx.moveTo(x + 6, fy);
+    ctx.quadraticCurveTo(x + 40 + wave, fy + 14, x + 6, fy + 34);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  function drawPlayer() {
+    const p = player;
+    const run = p.onGround && Math.abs(p.vx) > 0.3;
+    const legSwing = run ? Math.sin(p.anim) * 6 : 0;
+    const air = !p.onGround;
+
+    ctx.save();
+    ctx.translate(p.x + p.w / 2, p.y);
+    ctx.scale(p.face, 1);
+
+    // 다리
+    ctx.fillStyle = '#2a3d8f';
+    ctx.fillRect(-11, 24, 9, 14 + (air ? -3 : legSwing > 0 ? 0 : 0));
+    ctx.fillRect(2, 24, 9, 14);
+    ctx.fillStyle = '#5b3a1a';
+    ctx.fillRect(-13 + (run ? legSwing : 0), 34, 12, 5);
+    ctx.fillRect(1 - (run ? legSwing : 0), 34, 12, 5);
+
+    // 몸통 (멜빵바지)
+    ctx.fillStyle = '#2f49b3';
+    ctx.fillRect(-11, 18, 22, 10);
+    ctx.fillStyle = '#e3453a';
+    ctx.fillRect(-11, 12, 22, 8);
+    ctx.fillStyle = '#e3453a';
+    ctx.fillRect(-15, air ? 10 : 14, 6, 9);   // 팔
+    ctx.fillRect(9, air ? 10 : 14, 6, 9);
+
+    // 얼굴 + 모자
+    ctx.fillStyle = '#f5c69a';
+    ctx.fillRect(-9, 2, 18, 11);
+    ctx.fillStyle = '#e3453a';
+    ctx.fillRect(-10, -2, 20, 6);
+    ctx.fillRect(-2, -6, 12, 5);
+    ctx.fillStyle = '#1c1c1c';
+    ctx.fillRect(3, 5, 3, 4);
+    ctx.fillStyle = '#7a4a20';
+    ctx.fillRect(-1, 10, 8, 2);               // 콧수염
+    ctx.restore();
+  }
+
+  function draw() {
+    drawBackground();
+    ctx.save();
+    ctx.translate(-Math.round(cam.x), 0);
+    drawSolids();
+    drawFlag();
+    drawCoins();
+    drawFoes();
+    if (mode !== 'over') drawPlayer();
+    ctx.restore();
+
+    // 스테이지 이름 배너
+    if (mode === 'play' && tick < 150) {
+      ctx.globalAlpha = tick > 110 ? (150 - tick) / 40 : 1;
+      ctx.fillStyle = 'rgba(0,0,0,.45)';
+      ctx.fillRect(0, 190, W, 78);
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 30px "Segoe UI", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('STAGE ' + (stageIndex + 1) + ' — ' + level.name, W / 2, 238);
+      ctx.textAlign = 'left';
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  /* ---------- 60fps 고정 타임스텝 루프 ---------- */
+  const STEP = 1000 / 60;
+  let acc = 0, last = performance.now();
+  tick = 0;
+
+  function frame(now) {
+    requestAnimationFrame(frame);
+    acc += now - last;
+    last = now;
+    if (acc > 200) acc = 200;              // 탭 전환 등으로 밀린 시간은 버림
+    while (acc >= STEP) { step(); acc -= STEP; }
+    draw();
+  }
+
+  /* ---------- 입력 ---------- */
+  const JUMP_KEYS = ['ArrowUp', 'Space', 'KeyW'];
+
+  addEventListener('keydown', (e) => {
+    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) {
+      e.preventDefault();
+    }
+    if (e.repeat) { keys[e.code] = true; return; }
+    keys[e.code] = true;
+
+    if (e.code === 'KeyR') { resetGame(); return; }
+
+    if (JUMP_KEYS.includes(e.code)) {
+      if (mode === 'play') {
+        player.buffer = BUFFER;
+        player.jumpHeld = true;
+      } else if (mode === 'stageclear' || mode === 'over' || mode === 'allclear') {
+        advance();
+      }
+    }
+    if (e.code === 'Enter' &&
+        (mode === 'stageclear' || mode === 'over' || mode === 'allclear')) {
+      advance();
+    }
+  });
+
+  addEventListener('keyup', (e) => {
+    keys[e.code] = false;
+    if (JUMP_KEYS.includes(e.code) && player) player.jumpHeld = false;
+  });
+
+  ov.btn.addEventListener('click', advance);
+
+  resetGame();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
