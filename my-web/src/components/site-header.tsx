@@ -8,6 +8,7 @@ const NAV = [
   { href: "/links", label: "링크 모음" },
   { href: "/news", label: "주요 뉴스" },
   { href: "/dashboard", label: "대시보드" },
+  { href: "/market", label: "미국 증시" },
 ] as const;
 
 export function SiteHeader() {
@@ -15,7 +16,7 @@ export function SiteHeader() {
 
   return (
     <header className="border-b border-black/10 dark:border-white/15">
-      <nav className="mx-auto flex w-full max-w-2xl gap-6 px-6 py-4">
+      <nav className="mx-auto flex w-full max-w-3xl flex-wrap gap-x-6 gap-y-2 px-6 py-4">
         {NAV.map(({ href, label }) => {
           const active = isActive(pathname, href);
 

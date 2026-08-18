@@ -1,6 +1,28 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 
+/* 지마켓 산스 (GMarket Sans) — https://noonnu.cc/font_page/2 */
+@font-face {
+  font-family: 'GMarketSans';
+  src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2001@1.1/GmarketSansLight.woff') format('woff');
+  font-weight: 300;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'GMarketSans';
+  src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2001@1.1/GmarketSansMedium.woff') format('woff');
+  font-weight: 500;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'GMarketSans';
+  src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2001@1.1/GmarketSansBold.woff') format('woff');
+  font-weight: 700;
+  font-display: swap;
+}
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
@@ -9,8 +31,8 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-paperlogy);
-  --font-mono: var(--font-paperlogy);
+  --font-sans: 'GMarketSans';
+  --font-mono: 'GMarketSans';
 }
 
 @media (prefers-color-scheme: dark) {
@@ -23,7 +45,7 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-paperlogy), system-ui, sans-serif;
+  font-family: 'GMarketSans', system-ui, sans-serif;
 }
 
 /* 코드 블록까지 같은 글꼴을 쓰되, 글자 폭만 고정해 정렬을 유지한다 */
@@ -31,24 +53,35 @@ code,
 pre,
 kbd,
 samp {
-  font-family: var(--font-paperlogy), system-ui, sans-serif;
+  font-family: 'GMarketSans', system-ui, sans-serif;
   font-variant-numeric: tabular-nums;
 }
 
 /* 차트 색. 밝은 화면/어두운 화면 각각 검증한 값 (dataviz 기본 팔레트 slot 1) */
 .viz {
   --viz-series: #2a78d6;
+  --viz-series-2: #eb6834;
   --viz-muted: #898781;
   --viz-baseline: #c3c2b7;
   --viz-track: rgba(11, 11, 11, 0.05);
+
+  /* 등락 색은 한국 관습(상승 빨강 / 하락 파랑). 텍스트로 쓰이므로 WCAG AA 로 검증했다.
+     상승 4.80:1, 하락 5.96:1. 색만으로 뜻을 전하지 않도록 화면에는 늘 ▲▼ 를 함께 쓴다. */
+  --viz-up: #d03b3b;
+  --viz-down: #1a63b8;
 }
 
 @media (prefers-color-scheme: dark) {
   .viz {
     --viz-series: #3987e5;
+    --viz-series-2: #d95926;
     --viz-muted: #898781;
     --viz-baseline: #383835;
     --viz-track: rgba(255, 255, 255, 0.07);
+
+    /* 어두운 화면용으로 다시 고른 값. 상승 6.13:1, 하락 7.35:1 */
+    --viz-up: #e66767;
+    --viz-down: #53a2f0;
   }
 }
 

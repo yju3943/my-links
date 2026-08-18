@@ -1,0 +1,66 @@
+name: Build market page and publish to Pages
+
+on:
+  # 시세와 뉴스를 갱신하려고 주기적으로 다시 빌드한다.
+  # 정적 배포라 재빌드 없이는 숫자가 굳어 있기 때문이다.
+  schedule:
+    - cron: "10 * * * *"
+  push:
+    branches: [main]
+    # web/ 은 이 워크플로가 만들어 넣는 폴더다. 여기서 제외하지 않으면 스스로를 다시 트리거한다.
+    paths:
+      - "my-web/**"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: pages-build
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: my-web/package-lock.json
+
+      - name: 의존성 설치
+        working-directory: my-web
+        run: npm ci
+
+      - name: 정적 빌드
+        working-directory: my-web
+        env:
+          NEXT_OUTPUT: export
+          # 없으면 AI 요약만 안내 문구로 대체되고 나머지는 그대로 나온다.
+          AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+        run: npm run build
+
+      - name: web/ 으로 옮기기
+        run: |
+          rm -rf web
+          mkdir -p web
+          cp -r my-web/out/. web/
+          # Jekyll 이 _next 폴더를 밑줄로 시작한다고 무시하는 것을 막는다.
+          touch .nojekyll web/.nojekyll
+
+      - name: 바뀐 것이 있을 때만 커밋
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A web .nojekyll
+          if git diff --cached --quiet; then
+            echo "변경 없음 — 커밋하지 않습니다."
+          else
+            git commit -m "Rebuild market page ($(date -u '+%Y-%m-%d %H:%M UTC'))"
+            git push
+          fi

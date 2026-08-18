@@ -1,20 +1,6 @@
 import type { Metadata } from "next";
-import localFont from "next/font/local";
 import { SiteHeader } from "@/components/site-header";
 import "./globals.css";
-
-/** 페이퍼로지 (Paperlogy) — https://noonnu.cc/font_page/1456 */
-const paperlogy = localFont({
-  src: [
-    { path: "../fonts/Paperlogy-3Light.woff2", weight: "300", style: "normal" },
-    { path: "../fonts/Paperlogy-4Regular.woff2", weight: "400", style: "normal" },
-    { path: "../fonts/Paperlogy-5Medium.woff2", weight: "500", style: "normal" },
-    { path: "../fonts/Paperlogy-6SemiBold.woff2", weight: "600", style: "normal" },
-    { path: "../fonts/Paperlogy-7Bold.woff2", weight: "700", style: "normal" },
-  ],
-  variable: "--font-paperlogy",
-  display: "swap",
-});
 
 export const metadata: Metadata = {
   title: {
@@ -26,7 +12,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="ko" className={`${paperlogy.variable} h-full antialiased`}>
+    <html lang="ko" className="h-full antialiased">
       <body className="min-h-full flex flex-col">
         <SiteHeader />
         {children}

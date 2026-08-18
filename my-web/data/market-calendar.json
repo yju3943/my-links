@@ -1,0 +1,19 @@
+{
+  "_": "수동 관리 파일입니다. 자동으로 갱신되지 않습니다. 출처 — FOMC: federalreserve.gov/monetarypolicy/fomccalendars.htm / CPI·고용: bls.gov/schedule/news_release/ / PCE·GDP: bea.gov/news/schedule",
+  "updatedAt": "2026-08-18",
+  "updatedThrough": "2026-12-31",
+  "events": [
+    { "date": "2026-09-04", "time": "08:30 ET", "kind": "JOBS", "title": "8월 고용보고서", "note": "비농업 고용·실업률" },
+    { "date": "2026-09-10", "time": "08:30 ET", "kind": "CPI", "title": "8월 소비자물가(CPI)" },
+    { "date": "2026-09-16", "time": "14:00 ET", "kind": "FOMC", "title": "FOMC 성명·점도표", "note": "9월 회의 2일차, 의장 회견 14:30" },
+    { "date": "2026-09-25", "time": "08:30 ET", "kind": "PCE", "title": "8월 개인소비지출(PCE) 물가" },
+    { "date": "2026-10-02", "time": "08:30 ET", "kind": "JOBS", "title": "9월 고용보고서" },
+    { "date": "2026-10-13", "time": "08:30 ET", "kind": "CPI", "title": "9월 소비자물가(CPI)" },
+    { "date": "2026-10-28", "time": "14:00 ET", "kind": "FOMC", "title": "FOMC 성명", "note": "10월 회의 2일차" },
+    { "date": "2026-10-29", "time": "08:30 ET", "kind": "GDP", "title": "3분기 GDP 속보치" },
+    { "date": "2026-11-06", "time": "08:30 ET", "kind": "JOBS", "title": "10월 고용보고서" },
+    { "date": "2026-11-12", "time": "08:30 ET", "kind": "CPI", "title": "10월 소비자물가(CPI)" },
+    { "date": "2026-12-09", "time": "14:00 ET", "kind": "FOMC", "title": "FOMC 성명·점도표", "note": "12월 회의 2일차" },
+    { "date": "2026-12-10", "time": "08:30 ET", "kind": "CPI", "title": "11월 소비자물가(CPI)" }
+  ]
+}
